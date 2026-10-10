@@ -124,12 +124,12 @@
 | 按键 | 行为 |
 | --- | --- |
 | `Left/Right` | 按字符移动光标；**有选区时坍缩到选区对应边缘** |
-| `Ctrl+Left/Right` | 按单词移动 |
+| `Ctrl+Left/Right`、`Alt/Option+Left/Right` | 按单词移动 |
 | `Home/End` | 移到当前逻辑行首/行尾 |
 | `Ctrl+A` / `Ctrl+E` | `Ctrl+A` 打开子代理面板（编辑器内 `Mod+A` 仍移到行首）；`Ctrl+E` 移到行尾，还会展开或折叠长会话中隐藏的旧消息 |
 | `Ctrl+U` | 删除光标前内容 |
 | `Ctrl+K` | 删除光标后内容 |
-| `Ctrl+W` | 删除前一个单词 |
+| `Ctrl+W`、`Alt/Option+Backspace` | 删除前一个单词 |
 | `Backspace` / `Delete` | 删前一 / 后一字符；**有选区时删除整个选区** |
 | 打字 | **有选区时替换整个选区**，光标落在插入文本之后 |
 

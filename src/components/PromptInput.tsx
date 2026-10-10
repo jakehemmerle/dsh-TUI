@@ -3038,15 +3038,16 @@ export function PromptInput({
       }
       return
     }
-    if (isMod(key) && key.leftArrow) {
+    if ((isMod(key) || key.meta) && key.leftArrow) {
       // Jump to the previous word boundary (readline alt+b). Must precede the
-      // bare-arrow arms: Ctrl+Left arrives as leftArrow + ctrl. An active
+      // bare-arrow arms: Ctrl+Left arrives as leftArrow + ctrl, Alt/Option+Left
+      // (CSI 1;3D or ESC b) as leftArrow + meta. An active
       // selection collapses to its START edge first (editor semantics).
       const sel = selectionRef.current
       setInput(value, sel ? sel.start : wordBoundaryLeft(value, cursor))
       return
     }
-    if (isMod(key) && key.rightArrow) {
+    if ((isMod(key) || key.meta) && key.rightArrow) {
       // Jump to the next word boundary (readline alt+f).
       const sel = selectionRef.current
       setInput(value, sel ? sel.end : wordBoundaryRight(value, cursor))
@@ -3073,7 +3074,8 @@ export function PromptInput({
       setInput(value, sel ? sel.end : nextGraphemeBoundary(bounds, cursor))
       return
     }
-    if (key.backspace) {
+    // Alt/Option+Backspace (meta) falls through to the Ctrl+W word delete.
+    if (key.backspace && !key.meta) {
       if (cursor === 0) return
       const start = previousGraphemeBoundary(bounds, cursor)
       deleteInputRange(start, cursor)
@@ -3128,7 +3130,7 @@ export function PromptInput({
       undoDraft()
       return
     }
-    if (isMod(key) && input === 'w') {
+    if ((isMod(key) && input === 'w') || (key.meta && key.backspace)) {
       // Delete the word before the cursor: readline's whitespace-delimited
       // rule (skip trailing whitespace, then the word). The ICU/CJK
       // alternative is a separate editor-UX change, not part of draft undo.

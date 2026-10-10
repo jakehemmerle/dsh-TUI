@@ -1,5 +1,6 @@
 /**
- * Regression tests for Option+Enter / Shift+Enter newline parsing (#110).
+ * Regression tests for Option+Enter / Shift+Enter newline parsing (#110)
+ * and Option+Backspace (ESC DEL) parsing.
  *
  * Covers three delivery shapes:
  *  1. exact  — the sequence arrives alone ('\x1b\r', CSI u, modifyOtherKeys)
@@ -171,6 +172,20 @@ check('text + Ctrl+C + text keeps order', new Feeder().feed('ab\x03d'), [
   named('c', '\x03', { ctrl: true }),
   char('d'),
 ])
+// Option+Backspace under "Use Option as Meta": the pair must stay one
+// meta+backspace key. Split, the ESC became a bare Escape that cleared the
+// whole prompt draft.
+check('ESC DEL is meta+backspace (Option+Backspace)', new Feeder().feed('\x1b\x7f'), [
+  named('backspace', '\x1b\x7f', { meta: true }),
+])
+check('ESC BS is meta+backspace', new Feeder().feed('\x1b\b'), [
+  named('backspace', '\x1b\b', { meta: true }),
+])
+check('text + ESC DEL + text keeps order', new Feeder().feed('ab\x1b\x7fc'), [
+  text('ab'),
+  named('backspace', '\x1b\x7f', { meta: true }),
+  char('c'),
+])
 check('mixed CR stays a piped-line text token', new Feeder().feed('ab\rc'), [
   text('ab\rc'),
 ])
@@ -186,6 +201,13 @@ check('bracketed paste preserves embedded controls', new Feeder().feed('\x1b[200
   check('CR+text completing a buffered ESC splits correctly', f.feed('\rabc'), [
     ret({ meta: true }, '\x1b\r'),
     text('abc'),
+  ])
+}
+{
+  const f = new Feeder()
+  f.feed('\x1b')
+  check('DEL completing a buffered ESC is meta+backspace', f.feed('\x7f'), [
+    named('backspace', '\x1b\x7f', { meta: true }),
   ])
 }
 {

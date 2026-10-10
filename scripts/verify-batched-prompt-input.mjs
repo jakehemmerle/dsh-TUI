@@ -281,6 +281,23 @@ check(
   JSON.stringify(submitted),
 )
 
+// Option word editing under "Use Option as Meta": Option+Backspace (ESC DEL)
+// deletes the previous word instead of reaching Escape (which clears the
+// draft), and Option+Left/Right (CSI 1;3D/C, ESC b/f) jump by word like
+// Ctrl+Left/Right instead of moving one character.
+stdin.write('hello brave new world')
+for (const key of ['\x1b\x7f', '\x1b[1;3D', '\x1bb', 'X', '\x1bf', 'Y', '\x1b[1;3C', 'Z']) {
+  await sleep(100) // 固定窗:pacing 每个按键各自成 chunk
+  stdin.write(key)
+}
+await sleep(100) // 固定窗:pacing 按键分段步间
+stdin.write('\r')
+check(
+  'Option+Backspace deletes a word and Option+arrows jump by word',
+  await settled(() => submitted.at(-1) === 'hello Xbrave Ynew Z'),
+  JSON.stringify(submitted.at(-1)),
+)
+
 instance.unmount()
 
 if (failed > 0) {

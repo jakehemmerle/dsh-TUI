@@ -385,9 +385,12 @@ export const FIXED_RESERVED_COMBOS: readonly string[] = [
   'ctrl+u', // kill line
   'ctrl+k', // kill to end
   'ctrl+w', // kill word
+  'alt+backspace', // kill word (Option+Backspace)
   'ctrl+j', // newline fallback (legacy LF / extended key reporting)
   'ctrl+left', // word jump
   'ctrl+right', // word jump
+  'alt+left', // word jump (Option+Left)
+  'alt+right', // word jump (Option+Right)
   'ctrl+return', // newline (multi-line input)
   'ctrl+shift+return', // shift+Enter newline (CSI 13;6u) — same editor binding
   'alt+return', // newline fallback on terminals without shift reporting

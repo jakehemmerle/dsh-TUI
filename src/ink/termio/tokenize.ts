@@ -215,6 +215,14 @@ function tokenize(
           // the prompt instead of inserting a newline (#110).
           i++
           emitSequence(data.slice(seqStart, i))
+        } else if (code === C0.DEL || code === C0.BS) {
+          // Meta+Backspace: Option+Backspace arrives as ESC DEL (ESC BS on
+          // some terminals) under "Use Option as Meta". Neither is an ESC
+          // final byte; split, the ESC became a bare Escape that cleared the
+          // whole draft before the Backspace landed. Emitted as one sequence,
+          // parseKeypress reads it as backspace + meta.
+          i++
+          emitSequence(data.slice(seqStart, i))
         } else if (code === C0.ESC) {
           // Double escape - emit first, start new
           emitSequence(data.slice(seqStart, i))
