@@ -29,7 +29,7 @@ description: Use when the user asks about dsh-tui itself (usage, shortcuts, conf
 | Claude 后端：启用、登录、与 DSH 的差异、已知限制 | `claude-backend.md` |
 | Codex 后端：安装、登录、渠道、Plan、会话与原生能力 | `codex-backend.md` |
 | 主题、配色、自动检测、自定义主题 | `themes.md` |
-| 从 Claude Code / Codex / OMP / zcode / Grok 迁移会话 | `migrate.md` |
+| 从 Claude Code / Codex / OMP / Pi / zcode / Grok 迁移会话 | `migrate.md` |
 | VS Code 集成、扩展、IDE 选区 | `vscode.md` |
 | 插件生态、接缝稳定性分级 | `plugins.md` |
 

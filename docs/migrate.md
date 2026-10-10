@@ -2,7 +2,7 @@
 
 [文档索引](README.md) · [English](migrate.en.md)
 
-把 Claude Code、Codex、OMP、zcode、Grok Build 的本地对话历史导入 DSH
+把 Claude Code、Codex、OMP、Pi、zcode、Grok Build 的本地对话历史导入 DSH
 会话库。迁移后 `/resume` 按原工作目录浏览并恢复这些对话——换代理不丢
 历史上下文。
 
@@ -28,7 +28,8 @@ TUI 内等效入口：`/migrate`。裸 `/migrate` 弹出**多选源选择器**�
 | --- | --- | --- |
 | `claude-code` | `~/.claude/projects/` | 同一次响应拆成的多行（共用 `message.id`）合并为一步；thinking、工具调用与结果、压缩摘要、`/rename` 与生成标题都迁移；`isMeta` 上下文并入下一步；`subagents/` 与辅助 transcript 不成会话 |
 | `codex` | `~/.codex/sessions/` | 工具调用与三种输出形态、reasoning 摘要（明文部分）、`compacted` 摘要、中断轮、子代理报告都迁移；模型按 `turn_context` 逐步记录；注入块与子代理 rollout 不迁移 |
-| `omp` | `~/.omp/agent/sessions/` | 与 DSH 同源的近直接映射（文本与思考过程） |
+| `omp` | `~/.omp/agent/sessions/` | pi 的格式（OMP 是 pi 的分支），按 `pi` 同一套解析；OMP 自有的 `title` 行作为标题，`developer` 提醒并入下一步；子代理日志（每个会话文件旁的 `<session>/` 目录）不成会话 |
+| `pi` | `~/.pi/agent/sessions/`（可用 `PI_CODING_AGENT_SESSION_DIR` / `PI_CODING_AGENT_DIR` 重定位） | 只迁移会话树的当前分支；thinking、工具调用与结果（图片换占位）、压缩摘要、中断轮都迁移；`custom_message` 与 `branch_summary` 上下文并入下一步；`session_info` 名称作为标题；`!命令` 回显（`bashExecution`）不迁移 |
 | `zcode` | `~/.zcode/v2/sessions/` | 单 JSON 对象格式；只映射 user/assistant 文本，`meta.title` 作为标题 |
 | `grok-build` | `~/.grok/sessions/`（可用 `GROK_HOME` 重定位） | reasoning 行附着到其后的 assistant 步；工具调用与结果（图片换占位）、压缩摘要、中断轮、`session_summary` 标题都迁移；`<user_query>` 等包装只留正文；合成注入行与 `<user_info>` 不迁移 |
 
@@ -106,14 +107,17 @@ TUI 启动约 12 秒后做一次后台检测：任一源在最近 20 分钟内�
 - **全新 `DSH_HOME` 首跑报 installation rejected**：profile 自举撞上
   npm 上陈旧的 tarball 版本，升级 dsh 后自愈；或先用已有 profile。
 - **一个会话都没找到**：确认源代理的数据目录存在于当前用户家目录；
-  `grok-build` 用 `GROK_HOME` 重定位时需在环境变量中设置。
+  `grok-build` 用 `GROK_HOME` 重定位、pi 用 `PI_CODING_AGENT_SESSION_DIR` /
+  `PI_CODING_AGENT_DIR` 重定位时需在环境变量中设置。
 
 ## 设计取舍（维护者与贡献者参考）
 
 - 解析与 IO 分离：`adapters/<源>.parse.ts` 是纯函数（原始文本 → 轮模型），
   共享规则在 `parse/`（jsonl 坏行计数、注入识别与包装剥离、标题归一、
-  工具调用配对）；adapter 只做文件发现。OMP 仍产出角色列表，经
-  `fromRoleTurns` 机械折成轮。
+  工具调用配对）；adapter 只做文件发现。OMP 与 pi 共用
+  `adapters/pi.parse.ts`。
+- pi / OMP 压缩后，源里 `firstKeptEntryId` 起的条目仍留在上下文中；导入与
+  其他源一样把检查点写在下一轮之前，这些保留条目被检查点遮蔽。
 - grok 的 `synthetic_reason` 过滤：只迁缺省与显式 `human` 的用户行；
   `compaction_meta` 中的摘要行转为压缩检查点。
 - Claude 旧格式（2.0.x）的 `summary` 记录是写在文件头的一行叶子标题，

@@ -4,7 +4,7 @@
  * The first migration adapters normalized every source into an alternating
  * user/assistant list. {@link fromRoleTurns} folds that list into the turn
  * model mechanically — a user message opens a turn, every assistant message
- * after it is one step — so an adapter that still produces the list imports
+ * after it is one step — so a conversation written as that list imports
  * exactly as it did before the turn model existed.
  *
  * @module @deepseek-harness-tui/dsh-tui/migrate/parse/role-turns

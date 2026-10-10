@@ -11,8 +11,8 @@
 
 /**
  * One message of a foreign conversation as a flat role list — the shape the
- * omp adapter still produces; {@link fromRoleTurns} in parse/role-turns.ts
- * folds it into {@link ImportTurn}s.
+ * first adapters produced, kept for regression fixtures; {@link fromRoleTurns}
+ * in parse/role-turns.ts folds it into {@link ImportTurn}s.
  */
 export interface MigrationTurn {
   readonly role: 'user' | 'assistant'

@@ -638,4 +638,81 @@ const zcDoc = (messages, meta = {}) => JSON.stringify({
     && parseZcodeSession(zcDoc([{ role: 'user', content: '兜底问' }], { title: '' })).titleExplicit === false)
 }
 
+// ── 10. pi / omp ────────────────────────────────────────────────────────
+{
+  const { parsePiSession, latestOwnTitle } = await import('../src/dsh-adapter/migrate/adapters/pi.parse.js')
+  const raw = rows => rows.map(row => JSON.stringify(row)).join('\n')
+  const header = { type: 'session', version: 3, id: 'sid', timestamp: '2026-09-01T00:00:00Z', cwd: '/w/pi' }
+  let n = 0
+  /** 一条树节点：parentId 缺省接上一条。 */
+  const node = (type, fields, parentId = n === 0 ? null : `e${n}`) => ({ type, id: `e${++n}`, parentId, timestamp: '2026-09-01T00:00:01Z', ...fields })
+  const msg = (message, parentId) => node('message', { message }, parentId)
+  const parse = rows => parsePiSession({ raw: raw(rows), sourceId: 'sid' })
+
+  n = 0
+  const root = msg({ role: 'user', content: '第一问' })
+  const abandoned = msg({ role: 'assistant', content: [{ type: 'text', text: '放弃的分支' }] })
+  const branch = node('branch_summary', { summary: '分支摘要：试过 A', fromId: abandoned.id }, root.id)
+  const kept = msg({ role: 'assistant', content: [{ type: 'text', text: '当前分支' }] })
+  const tree = parse([header, root, abandoned, branch, kept])
+  check('10a. 只取当前分支（叶子到根的路径）；branch_summary 作下一步输入',
+    tree.turns.length === 1 && tree.turns[0].steps.length === 1 && tree.turns[0].steps[0].blocks[0].text === '当前分支'
+    && tree.turns[0].steps[0].inputs.join() === '分支摘要：试过 A' && tree.stats.meta === 1,
+    JSON.stringify(tree.turns))
+
+  n = 0
+  const tools = parse([
+    header,
+    msg({ role: 'user', content: [{ type: 'text', text: '<system-reminder>注入</system-reminder>' }, { type: 'text', text: '读文件' }, { type: 'image', data: 'AAAA', mimeType: 'image/png' }] }),
+    msg({ role: 'assistant', model: 'm1', content: [{ type: 'thinking', thinking: '想一想' }, { type: 'toolCall', id: 'c1', name: 'read', arguments: { path: 'a' } }, { type: 'toolCall', id: 'c2', name: 'read', arguments: { path: 'b' } }] }),
+    msg({ role: 'toolResult', toolCallId: 'c2', toolName: 'read', content: [{ type: 'image', data: 'AAAA' }], isError: true }),
+    msg({ role: 'toolResult', toolCallId: 'c1', toolName: 'read', content: [{ type: 'text', text: 'A 的内容' }], isError: false }),
+    msg({ role: 'toolResult', toolCallId: 'ghost', toolName: 'read', content: 'x', isError: false }),
+    node('custom_message', { customType: 'async-result', content: '后台任务完成', display: true }),
+    msg({ role: 'developer', content: [{ type: 'text', text: '<system-reminder>还有待办</system-reminder>' }] }),
+    msg({ role: 'bashExecution', command: 'ls', output: 'a b', exitCode: 0 }),
+    msg({ role: 'assistant', model: 'm1', content: [{ type: 'text', text: '完成' }] }),
+  ])
+  const [s1, s2] = tools.turns[0].steps
+  check('10b. 注入块不进提问，图片换占位；thinking/toolCall 原序成块，参数是 JSON',
+    tools.turns[0].prompt === '读文件\n\n[image]' && s1.model === 'm1'
+    && s1.blocks.map(b => b.type).join() === 'reasoning,tool-call,tool-call' && s1.blocks[1].arguments === '{"path":"a"}',
+    JSON.stringify(tools.turns[0]))
+  check('10c. 结果按 toolCallId 配回并按调用序排列；图片结果换占位、isError 保留；孤儿结果丢弃计数',
+    s1.results.map(r => `${r.callId}:${r.text}:${r.isError}`).join('|') === 'c1:A 的内容:false|c2:[image]:true'
+    && tools.stats.droppedToolResults === 1, JSON.stringify(s1.results))
+  check('10d. custom_message 与 developer 消息作下一步输入；bashExecution 与注入块计入 filtered',
+    s2.inputs.join('|') === '后台任务完成|<system-reminder>还有待办</system-reminder>' && tools.stats.meta === 2 && tools.stats.filtered === 2,
+    JSON.stringify({ inputs: s2.inputs, stats: tools.stats }))
+
+  n = 0
+  const compacted = parse([
+    header,
+    msg({ role: 'user', content: '压缩前' }),
+    msg({ role: 'assistant', model: 'm2', content: [{ type: 'text', text: '做到一半' }], stopReason: 'aborted' }),
+    node('compaction', { summary: '压缩摘要', firstKeptEntryId: 'e2', tokensBefore: 1 }),
+    msg({ role: 'assistant', model: 'm2', content: [{ type: 'text', text: '续跑' }] }),
+    msg({ role: 'user', content: '压缩后' }),
+  ])
+  const shape = compacted.turns.map(t => `${t.prompt || '∅'}${t.compaction ? `[${t.compaction.summary}@${t.compaction.model}]` : ''}:${t.steps.length}${t.aborted ? '!' : ''}`)
+  check('10e. stopReason aborted 标记中断轮；compaction 转检查点挂到边界后的轮（边界后续跑为空提问轮）',
+    shape.join('|') === '压缩前:1!|∅[压缩摘要@m2]:1|压缩后:0', shape.join('|'))
+
+  n = 0
+  const ask = msg({ role: 'user', content: '  兜底\n提问 ' })
+  const omp = parse([{ type: 'title', v: 1, title: 'OMP 标题', source: 'auto' }, { ...header, title: '旧标题' }, ask])
+  const renamed = parse([header, ask, node('session_info', { name: 'pi 名称' }, ask.id)])
+  const fallback = parse([header, ask])
+  check('10f. OMP title 行与 pi session_info 是显式标题（优先于头行 title）；没有时兜底首问且不算显式',
+    omp.title === 'OMP 标题' && omp.titleExplicit && renamed.title === 'pi 名称' && renamed.titleExplicit
+    && fallback.title === '兜底 提问' && fallback.titleExplicit === false)
+  check('10g. latestOwnTitle 取片段里最后设定的标题，没有时为 undefined',
+    latestOwnTitle(raw([{ type: 'title_change', title: '一' }, { type: 'session_info', name: '二' }])) === '二'
+    && latestOwnTitle(raw([ask])) === undefined)
+  const linear = parsePiSession({ raw: raw([{ type: 'session', cwd: '/w/v1' }, { type: 'message', message: { role: 'user', content: 'v1 提问' } }, { type: 'message', message: { role: 'assistant', content: [{ type: 'text', text: 'v1 回答' }] } }]), sourceId: 'v1' })
+  check('10h. 无 id 的 v1 会话按文件顺序读；无 cwd 或无提问的会话不成会话',
+    linear.turns[0].steps[0].blocks[0].text === 'v1 回答'
+    && parse([{ ...header, cwd: undefined }, ask]) === undefined && parse([header]) === undefined)
+}
+
 console.log(process.exitCode ? `${checks} check(s), FAILED` : `migrate parse regression passed (${checks} checks)`)

@@ -365,7 +365,7 @@ brings it back.
 
 The right side of the title row is the **source strip**: `DSH │ Claude Code  Codex …`.
 
-- A tab appears only for another coding agent on this machine (Claude Code, Codex, Grok Build, zcode) that has conversations, in a fixed order; with none, there is no strip. Opening the screen only checks whether each source has any conversation; a source's list is read when its tab is opened.
+- A tab appears only for another coding agent on this machine (Claude Code, Codex, OMP, Pi, zcode, Grok Build) that has conversations, in a fixed order; with none, there is no strip. Opening the screen only checks whether each source has any conversation; a source's list is read when its tab is opened.
 - The screen always opens on `DSH`; click a tab or press `Tab` / `Shift+Tab` to switch, which clears the filter.
 - On a narrow terminal the subtitle goes first, then trailing tabs fold into `+N` (click it for the rest); the active tab never folds.
 - A source tab has the same two columns: the rail groups conversations by working directory (a registered directory keeps its workspace name; conversations with no recorded directory share an "Unknown directory" group), and the list shows that directory's conversations, filtered live by title and directory.

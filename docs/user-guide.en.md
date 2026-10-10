@@ -194,7 +194,7 @@ Unrecognized keys are ignored, `Esc` does nothing, clear with `Ctrl+C`/`dd`.
 - Switch column `←/→`; move `↑/↓`/`PgUp`/`PgDn`; **typing = live filter** (by title/dir/branch/model).
 - Enter `Enter` (row 0 = new session in that workspace); new `Ctrl+Enter`/`Ctrl+N`; stop background session `Ctrl+X`.
 - `Ctrl+L` reload · `Enter` on the rail opens the action menu · `Esc` close hint → clear filter → leave.
-- Source tabs: when Claude Code / Codex / Grok Build / zcode have conversations on this machine, tabs appear on the right of the title row; switch with `Tab`/`Shift+Tab` or a click.
+- Source tabs: when Claude Code / Codex / OMP / Pi / zcode / Grok Build have conversations on this machine, tabs appear on the right of the title row; switch with `Tab`/`Shift+Tab` or a click.
   On a source tab `Enter`/click imports just that conversation and opens it (one imported before opens directly); a missing working directory is reported and nothing is imported; `Ctrl+L` rescans the source.
 - Mouse: click a session row = enter, click `★`/`☆` = toggle pin only, right-click a workspace row = action menu.
 - Empty input + `←` (or `/bg`) = send to background and open this screen, session keeps running.
@@ -362,7 +362,7 @@ The command menu = built-in commands (58, aliases included) + DSH registry comma
 | `/balance` | none | DeepSeek official account balance (free read-only API): summary line + hover detail (same session-estimate split: main/subagent/unpriced), click refresh, `×` close |
 | `/config` | none | config sources: `cordis.patch.yml` path, launch method, model routing |
 | `/doctor` | none | environment check |
-| `/migrate` | `[agent] [--dry-run]` | import conversation history from other coding agents (claude-code/codex/omp/zcode/grok-build); runs in a child process — see [Session migration](migrate.en.md) |
+| `/migrate` | `[agent] [--dry-run]` | import conversation history from other coding agents (claude-code/codex/omp/pi/zcode/grok-build); runs in a child process — see [Session migration](migrate.en.md) |
 | `/init` | none | create `AGENTS.md` in the working directory (created / exists / failed) |
 | `/agents` | none | subagent list for this session |
 | `/jobs` | none | background-task panel: status/runtime/exit-code tracking, `↑/↓` select, `k` stop; while open, `Esc` **closes only the panel** and won't interrupt the turn (close the panel first, then `Ctrl+C`) |

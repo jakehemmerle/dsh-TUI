@@ -2191,7 +2191,7 @@ const dict = {
   'cmd-desc-reload': { zh: '重读偏好文件并立即生效' },
   'cmd-desc-settings': { zh: '查看和编辑插件设置' },
   'cmd-desc-doctor': { zh: '运行环境检查' },
-  'cmd-desc-migrate': { zh: '从其他编程代理导入对话（claude-code/codex/omp/zcode/grok-build）' },
+  'cmd-desc-migrate': { zh: '从其他编程代理导入对话（claude-code/codex/omp/pi/zcode/grok-build）' },
   'cmd-desc-init': { zh: '在工作目录创建 AGENTS.md' },
   'cmd-desc-agents': { zh: '查看本会话的子代理' },
   'cmd-desc-jobs': { zh: '查看本会话的后台任务' },

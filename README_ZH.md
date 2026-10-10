@@ -130,11 +130,11 @@ TUI 启动后会在后台检查新版本，不阻塞首帧。有更新时输入 
 
 ### 迁移其他编程代理的对话（`dsh-tui migrate`）
 
-把 Claude Code、Codex、OMP、zcode、Grok Build 的本地对话历史导入 DSH 会话库，之后用 `/resume` 按原工作目录浏览与恢复：
+把 Claude Code、Codex、OMP、Pi、zcode、Grok Build 的本地对话历史导入 DSH 会话库，之后用 `/resume` 按原工作目录浏览与恢复：
 
 ```sh
 dsh-tui migrate                # 列出各代理可迁移的对话数量（不写入）
-dsh-tui migrate claude-code    # 导入 Claude Code 的全部对话（codex / omp / zcode / grok-build 同理）
+dsh-tui migrate claude-code    # 导入 Claude Code 的全部对话（codex / omp / pi / zcode / grok-build 同理）
 dsh-tui migrate codex --dry-run  # 只预览将落盘的内容，不写入
 ```
 
@@ -146,7 +146,7 @@ TUI 内：`/migrate`（或 `/migrate <agent> [--dry-run]`）以子进程运行�
 CLI 形态：任意终端运行 `dsh-tui migrate ...`，与 TUI 内执行同一套导入。
 完整指南：[会话迁移](docs/migrate.md)。
 
-- pi / opencode 等其他代理经 adapter 注册表逐步扩展；grok-build 支持读 `GROK_HOME` 环境变量
+- opencode 等其他代理经 adapter 注册表逐步扩展；grok-build 支持读 `GROK_HOME` 环境变量，pi 支持读 `PI_CODING_AGENT_SESSION_DIR` / `PI_CODING_AGENT_DIR`
 
 **VS Code**：用集成终端，或用 `dsh-tui-vscode` 扩展。见 [VS Code 使用指南](docs/vscode.md)。**Herdr**：在 [Herdr](https://herdr.dev) 窗格运行 `dsh-tui`，经其本地集成 API 报告 `idle` / `working` / `blocked`。
 

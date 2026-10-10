@@ -39,6 +39,7 @@ const { fromRoleTurns, emptyStats } = await import('../src/dsh-adapter/migrate/p
 const { claudeCodeAdapter } = await import('../src/dsh-adapter/migrate/adapters/claude-code.js')
 const { codexAdapter } = await import('../src/dsh-adapter/migrate/adapters/codex.js')
 const { ompAdapter } = await import('../src/dsh-adapter/migrate/adapters/omp.js')
+const { piAdapter } = await import('../src/dsh-adapter/migrate/adapters/pi.js')
 const { zcodeAdapter } = await import('../src/dsh-adapter/migrate/adapters/zcode.js')
 const { grokBuildAdapter } = await import('../src/dsh-adapter/migrate/adapters/grok-build.js')
 
@@ -684,7 +685,7 @@ const root = mkdtempSync(join(tmpdir(), 'verify-migrate-'))
     JSON.stringify({ timestamp: '2026-01-01T00:00:02Z', type: 'response_item', payload: { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'codex 答复' }] } }),
     '',
   ].join('\n'))
-  // omp：`--<munged-cwd>--/<timestamp>_<id>.jsonl`，session 头行 + message 行
+  // omp：`<munged-cwd>/<timestamp>_<id>.jsonl`，session 头行 + message 行（pi 格式）
   const ompDir = join(home, '.omp', 'agent', 'sessions', '--tmp-omp--')
   mkdirSync(ompDir, { recursive: true })
   writeFileSync(join(ompDir, `1790000000000_${firstUuid()}.jsonl`), [
@@ -692,7 +693,23 @@ const root = mkdtempSync(join(tmpdir(), 'verify-migrate-'))
     // message 为合法 JSON null（不得让 discover 抛未捕获 TypeError）
     JSON.stringify({ type: 'message', timestamp: '2026-01-01T00:00:00Z', message: null }),
     JSON.stringify({ type: 'message', timestamp: '2026-01-01T00:00:01Z', message: { role: 'user', content: [{ type: 'text', text: 'omp 提问' }] } }),
-    JSON.stringify({ type: 'message', timestamp: '2026-01-01T00:00:02Z', message: { role: 'assistant', content: [{ type: 'text', text: 'omp 答复' }, { type: 'thinking', text: 'omp 思考' }] } }),
+    JSON.stringify({ type: 'message', timestamp: '2026-01-01T00:00:02Z', message: { role: 'assistant', content: [{ type: 'text', text: 'omp 答复' }, { type: 'thinking', thinking: 'omp 思考' }] } }),
+    '',
+  ].join('\n'))
+  // omp 子代理日志在会话文件旁的同名目录里：属于父会话，不成会话
+  mkdirSync(join(ompDir, `1790000000000_${firstUuid()}`), { recursive: true })
+  writeFileSync(join(ompDir, `1790000000000_${firstUuid()}`, 'Task.jsonl'), [
+    JSON.stringify({ type: 'session', timestamp: '2026-01-01T00:00:00Z', cwd: '/tmp/omp' }),
+    JSON.stringify({ type: 'message', timestamp: '2026-01-01T00:00:01Z', message: { role: 'user', content: '子代理任务' } }),
+    '',
+  ].join('\n'))
+  // pi：`--<munged-cwd>--/<timestamp>_<id>.jsonl`，id/parentId 树
+  const piDir = join(home, '.pi', 'agent', 'sessions', '--tmp-pi--')
+  mkdirSync(piDir, { recursive: true })
+  writeFileSync(join(piDir, `2026-01-01T00-00-00-000Z_${firstUuid()}.jsonl`), [
+    JSON.stringify({ type: 'session', version: 3, id: firstUuid(), timestamp: '2026-01-01T00:00:00Z', cwd: '/tmp/pi' }),
+    JSON.stringify({ type: 'message', id: 'a1', parentId: null, timestamp: '2026-01-01T00:00:01Z', message: { role: 'user', content: 'pi 提问' } }),
+    JSON.stringify({ type: 'message', id: 'a2', parentId: 'a1', timestamp: '2026-01-01T00:00:02Z', message: { role: 'assistant', model: 'pi-model', content: [{ type: 'thinking', thinking: 'pi 思考' }, { type: 'text', text: 'pi 答复' }] } }),
     '',
   ].join('\n'))
 
@@ -742,6 +759,8 @@ const root = mkdtempSync(join(tmpdir(), 'verify-migrate-'))
   process.env.HOME = home
   process.env.USERPROFILE = home
   process.env.GROK_HOME = join(home, '.grok')
+  delete process.env.PI_CODING_AGENT_DIR
+  delete process.env.PI_CODING_AGENT_SESSION_DIR
   // 断言读轮模型：一轮 = 一个提问 + 若干步；reasoning 是步内的 reasoning 块
   const stepOf = session => session?.turns[0]?.steps[0]
   const blockText = (step, type) => step?.blocks.find(block => block.type === type)?.text
@@ -761,8 +780,14 @@ const root = mkdtempSync(join(tmpdir(), 'verify-migrate-'))
     && codexFound.sessions[0].cwd === '/tmp/codex')
   const ompFound = ompAdapter.discover()
   const ompStep = stepOf(ompFound.sessions[0])
-  check('6c. omp 解析（thinking 块）',
-    ompFound.sessions.length === 1 && ompFound.sessions[0].turns.length === 1 && blockText(ompStep, 'reasoning') === 'omp 思考')
+  check('6c. omp 解析（thinking 块；会话旁目录里的子代理日志不成会话，也不计入 count）',
+    ompFound.sessions.length === 1 && ompFound.sessions[0].turns.length === 1 && blockText(ompStep, 'reasoning') === 'omp 思考'
+    && ompAdapter.count() === 1, `count=${ompAdapter.count()}`)
+  const piFound = piAdapter.discover()
+  const piStep = stepOf(piFound.sessions[0])
+  check('6c2. pi 解析（字符串 user + thinking + model）',
+    piFound.sessions.length === 1 && piFound.sessions[0].turns[0].prompt === 'pi 提问' && blockText(piStep, 'reasoning') === 'pi 思考'
+    && piStep?.model === 'pi-model' && piFound.sessions[0].cwd === '/tmp/pi')
   const zcFound = zcodeAdapter.discover()
   check('6d. zcode 解析（单对象 + 元素级 null 跳过）',
     zcFound.sessions.length === 1 && zcFound.sessions[0].turns.length === 1 && zcFound.sessions[0].turns[0].steps.length === 1
@@ -776,19 +801,19 @@ const root = mkdtempSync(join(tmpdir(), 'verify-migrate-'))
   // sourceId 是幂等键的一部分（UUIDv5 输入）：它必须是裸文件名，不能把源目录
   // 带进来——join() 在 Windows 产出 `\`，旧实现的 split('/') 会退化成整条绝对
   // 路径，源目录一移动就重复导入。本断言在 Windows 抓得住这个回归。
-  const ids = [cc.sessions[0], codexFound.sessions[0], ompFound.sessions[0], zcFound.sessions[0], gbFound.sessions[0]]
+  const ids = [cc.sessions[0], codexFound.sessions[0], ompFound.sessions[0], piFound.sessions[0], zcFound.sessions[0], gbFound.sessions[0]]
     .map(session => session.sourceId)
-  check('6f. 五家 sourceId 都是裸文件名（不带路径分隔符，跨平台稳定）',
+  check('6f. 六家 sourceId 都是裸文件名（不带路径分隔符，跨平台稳定）',
     ids.every(id => typeof id === 'string' && id !== '' && !/[\\/]/u.test(id)), ids.join(' | '))
-  check('6g. claude-code/omp 的 sourceId 取到夹具 uuid 本身（而非路径原文）',
-    cc.sessions[0].sourceId === firstUuid() && ompFound.sessions[0].sourceId === firstUuid(),
-    `${cc.sessions[0].sourceId} | ${ompFound.sessions[0].sourceId}`)
+  check('6g. claude-code/omp/pi 的 sourceId 取到夹具 uuid 本身（而非路径原文）',
+    cc.sessions[0].sourceId === firstUuid() && ompFound.sessions[0].sourceId === firstUuid() && piFound.sessions[0].sourceId === firstUuid(),
+    `${cc.sessions[0].sourceId} | ${ompFound.sessions[0].sourceId} | ${piFound.sessions[0].sourceId}`)
   // 平台无关守卫：sourceId 不许用 split('/') 从路径里抠文件名——join() 在
   // Windows 产 `\`，那种写法只在 POSIX 正确，而 required CI 组全在 Linux 上
   // 跑（6f/6g 在 Linux 抓不到这个回归）。本断言在任何平台都有效；只看代码行，
   // 注释里解释这条规矩本身不算违规。
   const adapterDir = join(import.meta.dirname, '..', 'src/dsh-adapter/migrate/adapters')
-  const offenders = ['claude-code.ts', 'codex.ts', 'omp.ts', 'zcode.ts', 'grok-build.ts']
+  const offenders = ['claude-code.ts', 'codex.ts', 'pi.ts', 'zcode.ts', 'grok-build.ts']
     .filter(name => readFileSync(join(adapterDir, name), 'utf8')
       .split('\n')
       .filter(line => !/^\s*(?:\/\/|\*|\/\*)/u.test(line))

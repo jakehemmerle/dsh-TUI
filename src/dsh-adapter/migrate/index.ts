@@ -21,6 +21,7 @@ import { join } from 'node:path'
 import { claudeCodeAdapter } from './adapters/claude-code.js'
 import { codexAdapter } from './adapters/codex.js'
 import { ompAdapter } from './adapters/omp.js'
+import { piAdapter } from './adapters/pi.js'
 import { grokBuildAdapter } from './adapters/grok-build.js'
 import { zcodeAdapter } from './adapters/zcode.js'
 import { foreignSessionId, writeImportedSession } from './import-one.js'
@@ -30,6 +31,7 @@ export const MIGRATION_ADAPTERS: readonly MigrationAdapter[] = [
   claudeCodeAdapter,
   codexAdapter,
   ompAdapter,
+  piAdapter,
   zcodeAdapter,
   grokBuildAdapter,
 ]

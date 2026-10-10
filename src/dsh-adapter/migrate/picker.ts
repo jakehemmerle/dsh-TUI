@@ -24,7 +24,8 @@ export interface MigratePickerRow {
 export const MIGRATE_SCAN_SPECS: Readonly<Record<string, AdapterScanSpec>> = {
   'claude-code': { maxDepth: 3, fileMatch: name => name.endsWith('.jsonl') },
   codex: { maxDepth: 5, fileMatch: name => name.startsWith('rollout-') && name.endsWith('.jsonl') },
-  omp: { maxDepth: 3, fileMatch: name => name.endsWith('.jsonl') },
+  omp: { maxDepth: 1, fileMatch: name => name.endsWith('.jsonl') },
+  pi: { maxDepth: 1, fileMatch: name => name.endsWith('.jsonl') },
   zcode: { maxDepth: 3, fileMatch: name => name.endsWith('.json') },
   'grok-build': { maxDepth: 2, fileMatch: name => name === 'chat_history.jsonl' },
 }

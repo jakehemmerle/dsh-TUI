@@ -2,7 +2,7 @@
  * verify-migrate-browse — 外部来源浏览层回归（合成 fixture，临时目录，不读本机数据）。
  *
  * 覆盖 docs/foreign-session-tabs-design.md §3、§5、§7：扫描 IO 基础设施
- * （有界头尾窗口、异步遍历、并发扫描池、指纹复用）、四个源的 scan()/load()
+ * （有界头尾窗口、异步遍历、并发扫描池、指纹复用）、六个源的 scan()/load()
  * （摘要与全量解析一致、sessionKey 等于 discover() 的 sourceId）、browse
  * （存在性探测只走到第一个候选、同一进程内复用未变的摘要、不落盘、行上不
  * 暴露来源格式）、单会话导入。
@@ -97,7 +97,12 @@ const scratch = mkdtempSync(join(tmpdir(), 'verify-migrate-browse-'))
 
 // ── 公共：假 HOME（adapter 经 os.homedir() 定位源目录；Windows 读 USERPROFILE）──
 const home = join(scratch, 'home')
-const savedEnv = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE, GROK_HOME: process.env.GROK_HOME }
+const savedEnv = {
+  HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE, GROK_HOME: process.env.GROK_HOME,
+  PI_CODING_AGENT_DIR: process.env.PI_CODING_AGENT_DIR, PI_CODING_AGENT_SESSION_DIR: process.env.PI_CODING_AGENT_SESSION_DIR,
+}
+delete process.env.PI_CODING_AGENT_DIR
+delete process.env.PI_CODING_AGENT_SESSION_DIR
 process.env.HOME = home
 process.env.USERPROFILE = home
 process.env.GROK_HOME = join(home, '.grok')
@@ -214,6 +219,57 @@ const keyed = entries => entries.filter(e => e.summary !== null).map(e => e.summ
     zcEntries.length === 2 && zcSummaries.length === 1 && zcSummaries[0].title === 'zcode 标题' && zcSummaries[0].createdAt === 1790000000000
     && JSON.stringify(zcSummaries.map(s => s.sessionKey)) === JSON.stringify(discoveredKeys(zcodeAdapter))
     && JSON.stringify(await zcodeAdapter.load(zcSummaries[0].ref)) === JSON.stringify(zcodeAdapter.discover().sessions[0]))
+
+  // omp：会话文件 + 会话旁目录里的子代理日志（不成会话）
+  const { ompAdapter } = await import('../src/dsh-adapter/migrate/adapters/omp.js')
+  const { piAdapter } = await import('../src/dsh-adapter/migrate/adapters/pi.js')
+  const ompId = '01a1239d-d339-70da-abf0-dc7619348a53'
+  const ompDir = join(home, '.omp', 'agent', 'sessions', '-w-omp')
+  const ompFile = join(ompDir, `2026-09-01T00-00-00-000Z_${ompId}.jsonl`)
+  mkdirSync(join(ompDir, `2026-09-01T00-00-00-000Z_${ompId}`), { recursive: true })
+  writeFileSync(ompFile, jsonl([
+    { type: 'title', v: 1, title: 'OMP 会话标题', source: 'auto' },
+    { type: 'session', version: 3, id: ompId, timestamp: '2026-09-01T00:00:00Z', cwd: '/w/omp' },
+    { type: 'message', id: 'a1', parentId: null, timestamp: '2026-09-01T00:00:01Z', message: { role: 'user', content: [{ type: 'text', text: 'OMP 提问' }] } },
+    { type: 'message', id: 'a2', parentId: 'a1', timestamp: '2026-09-01T00:00:02Z', message: { role: 'assistant', content: [{ type: 'text', text: '答' }] } },
+  ]))
+  writeFileSync(join(ompDir, `2026-09-01T00-00-00-000Z_${ompId}`, 'Task.jsonl'), jsonl([
+    { type: 'session', version: 3, id: 'child', timestamp: '2026-09-01T00:00:00Z', cwd: '/w/omp', parentSession: ompFile },
+    { type: 'message', id: 'b1', parentId: null, timestamp: '2026-09-01T00:00:01Z', message: { role: 'user', content: '子代理任务' } },
+  ]))
+  const ompEntries = await ompAdapter.scan()
+  const ompSummaries = keyed(ompEntries)
+  check('3h. omp：只扫项目目录下的会话文件（子代理日志不扫）；标题取 title 行；sessionKey 等于 discover 的 sourceId，load 与 discover 一致',
+    ompEntries.length === 1 && ompSummaries[0].title === 'OMP 会话标题' && ompSummaries[0].sessionKey === ompId && ompSummaries[0].cwd === '/w/omp'
+    && JSON.stringify(ompSummaries.map(s => s.sessionKey)) === JSON.stringify(discoveredKeys(ompAdapter))
+    && JSON.stringify(await ompAdapter.load(ompFile)) === JSON.stringify(ompAdapter.discover().sessions[0]),
+    JSON.stringify(ompSummaries))
+
+  // pi：首问在头窗口内、/name 写在 32KB 之后的尾部；PI_CODING_AGENT_SESSION_DIR 重定位存储
+  const piId = '0199bbbb-0000-7000-8000-000000000001'
+  const piDir = join(home, '.pi', 'agent', 'sessions', '--w-pi--')
+  mkdirSync(piDir, { recursive: true })
+  const piFile = join(piDir, `2026-09-01T00-00-00-000Z_${piId}.jsonl`)
+  writeFileSync(piFile, jsonl([
+    { type: 'session', version: 3, id: piId, timestamp: '2026-09-01T00:00:00Z', cwd: '/w/pi' },
+    { type: 'message', id: 'p1', parentId: null, timestamp: '2026-09-01T00:00:01Z', message: { role: 'user', content: 'pi 提问' } },
+    { type: 'message', id: 'p2', parentId: 'p1', timestamp: '2026-09-01T00:00:02Z', message: { role: 'assistant', content: [{ type: 'text', text: '长'.repeat(20000) }] } },
+    { type: 'session_info', id: 'p3', parentId: 'p2', timestamp: '2026-09-01T00:00:03Z', name: '后来起的名字' },
+  ]))
+  const piSummaries = keyed(await piAdapter.scan())
+  check('3i. pi：尾窗口里的 session_info 名称作标题；sessionKey 等于 discover 的 sourceId，load 与 discover 一致',
+    piSummaries.length === 1 && piSummaries[0].title === '后来起的名字' && piSummaries[0].sessionKey === piId
+    && JSON.stringify(piSummaries.map(s => s.sessionKey)) === JSON.stringify(discoveredKeys(piAdapter))
+    && JSON.stringify(await piAdapter.load(piFile)) === JSON.stringify(piAdapter.discover().sessions[0]),
+    JSON.stringify(piSummaries))
+  process.env.PI_CODING_AGENT_SESSION_DIR = join(scratch, 'pi-elsewhere')
+  const relocated = piAdapter.roots()
+  delete process.env.PI_CODING_AGENT_SESSION_DIR
+  process.env.PI_CODING_AGENT_DIR = join(scratch, 'pi-agent')
+  const agentDir = piAdapter.roots()
+  delete process.env.PI_CODING_AGENT_DIR
+  check('3j. pi：PI_CODING_AGENT_SESSION_DIR 优先，其次 PI_CODING_AGENT_DIR/sessions',
+    relocated.join() === join(scratch, 'pi-elsewhere') && agentDir.join() === join(scratch, 'pi-agent', 'sessions'))
 }
 
 // ── 4. browse：存在性探测、进程内复用、generation 保护、不落盘 ─────────
@@ -225,6 +281,7 @@ const keyed = entries => entries.filter(e => e.summary !== null).map(e => e.summ
   const { grokBuildAdapter } = await import('../src/dsh-adapter/migrate/adapters/grok-build.js')
   const { zcodeAdapter } = await import('../src/dsh-adapter/migrate/adapters/zcode.js')
   const { ompAdapter } = await import('../src/dsh-adapter/migrate/adapters/omp.js')
+  const { piAdapter } = await import('../src/dsh-adapter/migrate/adapters/pi.js')
 
   // 记录 cached 命中次数：命中 = 这次没有重读该条目
   let hits = 0
@@ -239,12 +296,14 @@ const keyed = entries => entries.filter(e => e.summary !== null).map(e => e.summ
       },
     }),
   }
-  const adapters = [spied, codexAdapter, ompAdapter, zcodeAdapter, grokBuildAdapter]
+  // 没有 walk/scan/load 的 adapter 只能批量迁移，不可浏览
+  const migrateOnly = { id: 'migrate-only', label: 'Migrate only', roots: () => [home], discover: () => ({ roots: [home], sessions: [] }) }
+  const adapters = [spied, codexAdapter, ompAdapter, piAdapter, migrateOnly, zcodeAdapter, grokBuildAdapter]
   const browser = createForeignBrowser(() => undefined, undefined, adapters)
 
   const sources = await browser.listSources()
-  check('4a. 探测只列可浏览且有候选的来源（omp 不在），按注册顺序，只带 id 与名称',
-    sources.map(s => s.agentId).join(',') === 'claude-code,codex,zcode,grok-build'
+  check('4a. 探测只列可浏览且有候选的来源（只能批量迁移的不在），按注册顺序，只带 id 与名称',
+    sources.map(s => s.agentId).join(',') === 'claude-code,codex,omp,pi,zcode,grok-build'
     && sources.every(s => Object.keys(s).sort().join(',') === 'agentId,label'),
     JSON.stringify(sources))
 
@@ -426,16 +485,16 @@ const keyed = entries => entries.filter(e => e.summary !== null).map(e => e.summ
   ]))
   const browser = createForeignBrowser(() => persistence)
   const sources = await browser.listSources()
-  check('6a. 默认注册表下探测列出四个可浏览来源（不含 omp）',
-    sources.map(s => s.agentId).join(',') === 'claude-code,codex,zcode,grok-build', sources.map(s => s.agentId).join(','))
+  check('6a. 默认注册表下探测列出六个可浏览来源',
+    sources.map(s => s.agentId).join(',') === 'claude-code,codex,omp,pi,zcode,grok-build', sources.map(s => s.agentId).join(','))
   const rows = await browser.listSessions('claude-code')
   const byTitle = title => rows.find(row => row.title === title)
   const missing = await browser.importSession('claude-code', byTitle('最后的名字').key)
   check('6b. 行上的 cwd 不存在时不导入', missing.kind === 'cwd-missing' && missing.cwd === '/w/cc' && writes.length === 0)
   const outcome = await browser.importSession('claude-code', byTitle('可导入的会话').key)
   check('6c. 导入经宿主 sessionPersistence 写入', outcome.kind === 'ready' && outcome.created === true && writes.length === 1)
-  const unknown = await browser.importSession('omp', byTitle('可导入的会话').key)
-  check('6d. 不可浏览的来源报告 unknown-source', unknown.kind === 'failed' && unknown.reason === 'unknown-source')
+  const unknown = await browser.importSession('migrate-only', byTitle('可导入的会话').key)
+  check('6d. 未注册或不可浏览的来源报告 unknown-source', unknown.kind === 'failed' && unknown.reason === 'unknown-source')
   const classes = ['listForeignSources', 'listForeignSessions', 'importForeignSession'].map(name => CHANNEL_UI_EFFECTS[name])
   check('6e. 三个方法都登记了副作用分类（导入为 mutate）', classes.join(',') === 'read-only,read-only,mutate', classes.join(','))
 }

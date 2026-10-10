@@ -2,7 +2,7 @@
 
 [Documentation index](README.md) · [简体中文](migrate.md)
 
-Bring Claude Code, Codex, OMP, zcode, and Grok Build conversation histories
+Bring Claude Code, Codex, OMP, Pi, zcode, and Grok Build conversation histories
 into the DSH session store. After importing, `/resume` browses and restores
 them by their original working directory — switching agents no longer costs
 your history.
@@ -33,7 +33,8 @@ row. Both entry points share the same import logic and idempotency rules.
 | --- | --- | --- |
 | `claude-code` | `~/.claude/projects/` | Lines split from one response (sharing `message.id`) merge into one step; thinking, tool calls and results, compaction summaries, `/rename` and generated titles all migrate; `isMeta` context joins the next step; `subagents/` and auxiliary transcripts are not sessions |
 | `codex` | `~/.codex/sessions/` | Tool calls with all three output shapes, reasoning summaries (the readable part), `compacted` summaries, interrupted turns and sub-agent reports migrate; the model is recorded per step from `turn_context`; injected blocks and sub-agent rollouts do not |
-| `omp` | `~/.omp/agent/sessions/` | DSH-lineage store, a near-direct mapping (text and thinking) |
+| `omp` | `~/.omp/agent/sessions/` | Pi's format (OMP is a pi fork), parsed as for `pi`; OMP's own `title` rows become the title, its `developer` reminders join the next step; sub-agent logs (the `<session>/` directory beside each file) are not sessions |
+| `pi` | `~/.pi/agent/sessions/` (relocatable via `PI_CODING_AGENT_SESSION_DIR` / `PI_CODING_AGENT_DIR`) | Only the active branch of the session tree migrates; thinking, tool calls and results (images as placeholders), compaction summaries and aborted turns migrate; `custom_message` and `branch_summary` context joins the next step; the `session_info` name becomes the title; `!command` echoes (`bashExecution`) do not migrate |
 | `zcode` | `~/.zcode/v2/sessions/` | Single-JSON-object format; only user/assistant text is mapped, `meta.title` becomes the title |
 | `grok-build` | `~/.grok/sessions/` (relocatable via `GROK_HOME`) | Reasoning rows attach to the assistant step that follows; tool calls and results (images as placeholders), compaction summaries, interrupted turns and the `session_summary` title migrate; `<user_query>` and similar wrappers keep only the body; synthetic rows and `<user_info>` do not migrate |
 
@@ -134,15 +135,19 @@ with that source pre-checked; any other key dismisses it.
   existing profile meanwhile.
 - **Nothing found at all**: confirm the foreign agent's data directory
   exists under the current home; set `GROK_HOME` when grok-build lives
-  elsewhere.
+  elsewhere, and `PI_CODING_AGENT_SESSION_DIR` / `PI_CODING_AGENT_DIR` when
+  pi does.
 
 ## Design notes (for maintainers and contributors)
 
 - Parsing is separate from IO: `adapters/<source>.parse.ts` are pure
   functions (raw text → turn model) over shared rules in `parse/` (jsonl
   bad-line counting, injection recognition and unwrapping, title
-  normalization, tool-call pairing); adapters only discover files. OMP still
-  produces a role list, folded into turns mechanically by `fromRoleTurns`.
+  normalization, tool-call pairing); adapters only discover files. OMP and
+  pi share `adapters/pi.parse.ts`.
+- pi / OMP compaction keeps the entries from `firstKeptEntryId` in the
+  source's own context; the import writes the checkpoint in front of the next
+  turn like the other sources, so those kept entries are shadowed by it.
 - grok's `synthetic_reason` filter: only default and explicitly `human`
   user rows migrate; the summary row among `compaction_meta` becomes a
   compaction checkpoint.

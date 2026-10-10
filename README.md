@@ -153,11 +153,11 @@ Safe mode: [Getting started](docs/getting-started.en.md).
 
 ### Importing conversations from other agents (`dsh-tui migrate`)
 
-Bring Claude Code, Codex, OMP, zcode, or Grok Build conversation histories into the DSH session store, then browse and resume them by their original working directory via `/resume`:
+Bring Claude Code, Codex, OMP, Pi, zcode, or Grok Build conversation histories into the DSH session store, then browse and resume them by their original working directory via `/resume`:
 
 ```sh
 dsh-tui migrate                # list importable counts per agent (writes nothing)
-dsh-tui migrate claude-code    # import every Claude Code conversation (likewise codex / omp / zcode / grok-build)
+dsh-tui migrate claude-code    # import every Claude Code conversation (likewise codex / omp / pi / zcode / grok-build)
 dsh-tui migrate codex --dry-run  # preview what would land, write nothing
 ```
 
@@ -169,7 +169,7 @@ In-TUI: `/migrate` (optionally `/migrate <agent> [--dry-run]`) runs the same imp
 CLI alternative: `dsh-tui migrate ...` from any shell runs the same import.
 Full guide: [Session migration](docs/migrate.en.md).
 
-- More agents (pi, opencode, …) extend the adapter registry as adapters land; grok-build reads `GROK_HOME` when set.
+- More agents (opencode, …) extend the adapter registry as adapters land; grok-build reads `GROK_HOME` when set, pi reads `PI_CODING_AGENT_SESSION_DIR` / `PI_CODING_AGENT_DIR`.
 
 **VS Code**: use the integrated terminal or the `dsh-tui-vscode` extension. See [VS Code guide](docs/vscode.en.md). **Herdr**: run `dsh-tui` in a [Herdr](https://herdr.dev) pane; `idle` / `working` / `blocked` are reported through its local integration API.
 
